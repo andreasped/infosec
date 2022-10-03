@@ -1,6 +1,6 @@
 from cmath import log
 from flask import render_template, flash, redirect, url_for, request, session, abort
-from app import app, query_db
+from app import app, query_db, query_userId, get_db, query_username, query_formRegister, query_postStream
 from app.forms import IndexForm, PostForm, FriendsForm, ProfileForm, CommentsForm
 from datetime import datetime
 from flask_login import LoginManager, login_required, login_user, logout_user, UserMixin, current_user
@@ -34,11 +34,11 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    user = query_db('SELECT * FROM Users WHERE id="{}";'.format(user_id), one=True)
-    if user is None:
+    user = query_userId(get_db(), user_id)
+    if len(user) == 0:
         return None
     else:
-        return User(user_id, user[1], user[2])
+        return User(user[0][0], user[0][1], user[0][4])
 
 # home page/login/registration
 @app.route('/', methods=['GET', 'POST'])
@@ -46,20 +46,20 @@ def load_user(user_id):
 def index():
     form = IndexForm()
     if form.login.validate_on_submit() and form.login.submit.data:
-        user = query_db('SELECT * FROM Users WHERE username="{}";'.format(form.login.username.data), one=True)
-        if user == None or check_password_hash(user['password'],  form.login.password.data) == False:
+        user = query_username(get_db(), form.login.username.data)
+        if user == None or check_password_hash(user[0][4],  form.login.password.data) == False:
             flash('Sorry, wrong password or username!')
         else:
-            us = load_user(user["id"])
+            us = load_user(user[0][0])
             login_user(us, remember=form.login.remember_me.data)
-            session["username"] = user["username"]
+            session["username"] = user[0][1]
             print(session)
             return redirect(url_for('stream', username=form.login.username.data))
 
 
     elif form.register.validate_on_submit():
-        query_db('INSERT INTO Users (username, first_name, last_name, password) VALUES("{}", "{}", "{}", "{}");'.format(form.register.username.data, form.register.first_name.data,
-        form.register.last_name.data, generate_password_hash(form.register.password.data)))
+        query_formRegister(get_db(), form.register.username.data, form.register.first_name.data,
+        form.register.last_name.data, generate_password_hash(form.register.password.data))
         return redirect(url_for('index'))
     return render_template('index.html', title='Welcome', form = form)
 
@@ -86,16 +86,16 @@ def allowed_file(filename):
 def stream():
     form = PostForm()
     username = current_user.username
-    user = query_db('SELECT * FROM Users WHERE username="{}";'.format(username), one=True)
+    user = query_username(get_db(), username)
     if form.is_submitted():
         if form.image.data and allowed_file(form.image.data.filename):
             path = os.path.join(app.config['UPLOAD_PATH'], form.image.data.filename)
             form.image.data.save(path)
-            query_db('INSERT INTO Posts (u_id, content, image, creation_time) VALUES({}, "{}", "{}", \'{}\');'.format(user['id'], form.content.data, form.image.data.filename, datetime.now()))
+            query_postStream(get_db(), user[0][0], form.content.data, form.image.data.filename, datetime.now())
             return redirect(url_for('stream', username=username))
         else:
             flash("Can only upload images!")
-    posts = query_db('SELECT p.*, u.*, (SELECT COUNT(*) FROM Comments WHERE p_id=p.id) AS cc FROM Posts AS p JOIN Users AS u ON u.id=p.u_id WHERE p.u_id IN (SELECT u_id FROM Friends WHERE f_id={0}) OR p.u_id IN (SELECT f_id FROM Friends WHERE u_id={0}) OR p.u_id={0} ORDER BY p.creation_time DESC;'.format(user['id']))
+    posts = query_db('SELECT p.*, u.*, (SELECT COUNT(*) FROM Comments WHERE p_id=p.id) AS cc FROM Posts AS p JOIN Users AS u ON u.id=p.u_id WHERE p.u_id IN (SELECT u_id FROM Friends WHERE f_id={0}) OR p.u_id IN (SELECT f_id FROM Friends WHERE u_id={0}) OR p.u_id={0} ORDER BY p.creation_time DESC;'.format(user[0][0]))
     return render_template('stream.html', title='Stream', username=username, form=form, posts=posts)
 
 
