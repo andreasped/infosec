@@ -113,10 +113,11 @@ def comments(username, p_id):
     return render_template('comments.html', title='Comments', username=username, form=form, post=post, comments=all_comments)
 
 # page for seeing and adding friends
-@app.route('/friends/<username>', methods=['GET', 'POST'])
+@app.route('/friends', methods=['GET', 'POST'])
 @login_required
-def friends(username):
+def friends():
     form = FriendsForm()
+    username = current_user.username
     user = query_db('SELECT * FROM Users WHERE username="{}";'.format(username), one=True)
     if form.is_submitted():
         friend = query_db('SELECT * FROM Users WHERE username="{}";'.format(form.username.data), one=True)
@@ -129,10 +130,11 @@ def friends(username):
     return render_template('friends.html', title='Friends', username=username, friends=all_friends, form=form)
 
 # see and edit detailed profile information of a user
-@app.route('/profile/<username>', methods=['GET', 'POST'])
+@app.route('/profile', methods=['GET', 'POST'])
 @login_required
-def profile(username):
+def profile():
     form = ProfileForm()
+    username = current_user.username
     if form.validate_on_submit():
         query_db('UPDATE Users SET education="{}", employment="{}", music="{}", movie="{}", nationality="{}", birthday=\'{}\' WHERE username="{}" ;'.format(
             form.education.data, form.employment.data, form.music.data, form.movie.data, form.nationality.data, form.birthday.data, username
