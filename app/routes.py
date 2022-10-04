@@ -88,11 +88,13 @@ def stream():
     username = current_user.username
     user = query_username(get_db(), username)
     if form.is_submitted():
-        if form.image.data and allowed_file(form.image.data.filename):
+        if  form.image.data and allowed_file(form.image.data.filename):
             path = os.path.join(app.config['UPLOAD_PATH'], form.image.data.filename)
             form.image.data.save(path)
             query_postStream(get_db(), user[0][0], form.content.data, form.image.data.filename, datetime.now())
             return redirect(url_for('stream', username=username))
+        elif form.content.data:
+            query_postStream(get_db(), user[0][0], form.content.data, "", datetime.now())
         else:
             flash("Can only upload images!")
     posts = query_db('SELECT p.*, u.*, (SELECT COUNT(*) FROM Comments WHERE p_id=p.id) AS cc FROM Posts AS p JOIN Users AS u ON u.id=p.u_id WHERE p.u_id IN (SELECT u_id FROM Friends WHERE f_id={0}) OR p.u_id IN (SELECT f_id FROM Friends WHERE u_id={0}) OR p.u_id={0} ORDER BY p.creation_time DESC;'.format(user[0][0]))
